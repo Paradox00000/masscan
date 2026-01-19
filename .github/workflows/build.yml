@@ -1,0 +1,22 @@
+name: Build Masscan EXE
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Build Solution
+        run: |
+          cd vs10
+          msbuild masscan.sln /p:Configuration=Release /p:Platform=x64
+
+      - name: Upload Result
+        uses: actions/upload-artifact@v3
+        with:
+          name: masscan-windows-binary
+          path: vs10/bin/masscan.exe
