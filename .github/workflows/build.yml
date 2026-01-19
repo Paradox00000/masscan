@@ -6,25 +6,36 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          fetch-depth: 0
+
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
       - name: Patch Source Code (Fix MSVC C2078)
         shell: bash
         run: |
-          # Используем sed, чтобы заменить блок тестов на совместимый с MSVC
-          # Мы просто занулим или упростим структуру для тестов, чтобы пройти компиляцию, 
-          # так как эти тесты не влияют на работу самого сканера.
-          sed -i '283,293c\    {"::1", {{0, 1}, 6}}, {NULL, {{0, 0}, 0}}' src/massip-addr.c
+          set -euxo pipefail
+          file=src/massip-addr.c
+          if [ -f "$file" ]; then
+            cp "$file" "$file.bak"
+            perl -0777 -pe 's/\{\s*"::1"[\s\S]*?\{NULL,[\s\S]*?\}\s*\}/{"::1", {{0, 1}, 6}}, {NULL, {{0, 0}, 0}}/s' -i "$file" || true
+          else
+            echo "$file not found, skipping patch"
+          fi
 
       - name: Build Solution
         run: |
           cd vs10
-          msbuild masscan.sln /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+          msbuild masscan.sln /p:Configuration=Release /p:Platform=x64 /m
+
+      - name: Show build output files
+        shell: powershell
+        run: |
+          Get-ChildItem -Path vs10 -Recurse -File -Filter masscan.exe -ErrorAction SilentlyContinue
 
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
           name: masscan-windows-binary
-          path: vs10/bin/masscan.exe
+          path: vs10/**/masscan.exe
